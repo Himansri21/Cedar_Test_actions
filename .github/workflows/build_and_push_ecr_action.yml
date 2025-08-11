@@ -1,0 +1,61 @@
+name: Build and Push to ECR
+
+on:
+  workflow_call:
+    inputs:
+      aws-region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      aws-ecr-repo:
+        description: 'AWS ECR Repo Name'
+        required: true
+        type: string
+      ecr-image-name:
+        description: 'ECR Image Name'
+        required: true
+        type: string
+      account-id:
+        description: 'AWS Account'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-push-ecr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.account-id }}:role/OIDC-assumeRole-GithubActions
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Login to Amazon ECR Private
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Inject Version Info
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          COMMIT_ID=$GITHUB_SHA
+          BUILD_TIME=$(($(date -u +%s)*1000))
+          sed -i "s/BranchNotSet/$BRANCH_NAME/g" src/main/resources/application.yml
+          sed -i "s/CommitNotSet/$COMMIT_ID/g" src/main/resources/application.yml
+          sed -i "s/TimeNotSet/$BUILD_TIME/g" src/main/resources/application.yml
+        shell: bash
+
+      - name: Build, tag, and push docker image to Amazon ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ inputs.aws-ecr-repo }}
+          IMAGE_TAG: ${{ inputs.ecr-image-name }}
+        run: |
+          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
