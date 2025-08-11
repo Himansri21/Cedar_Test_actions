@@ -1,0 +1,34 @@
+name: Deploy Service
+
+on:
+  workflow_call:
+    inputs:
+      aws-region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      aws-ecr-repo:
+        description: 'AWS ECR Repo Name'
+        required: true
+        type: string
+      aws-image-name:
+        description: 'The name of the image to deploy'
+        required: true
+        type: string
+      account-id:
+        description: 'AWS Account ID'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-push:
+    uses: ./.github/workflows/build_and_push_ecr_action.yml
+    with:
+      aws-region: ${{ inputs.aws-region }}
+      aws-ecr-repo: ${{ inputs.aws-ecr-repo }}
+      ecr-image-name: ${{ inputs.aws-image-name }}
+      account-id : ${{ inputs.account-id }}
