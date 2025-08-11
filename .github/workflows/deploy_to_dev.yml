@@ -2,6 +2,7 @@
 name: Deploy Service to Dev
 
 on:
+  workflow_dispatch: 
   push:
     branches:
       - develop
@@ -17,4 +18,5 @@ jobs:
       aws-region: eu-west-1
       aws-ecr-repo: cedar-server
       aws-image-name: dev-latest
+
       account-id: '158244227699'
