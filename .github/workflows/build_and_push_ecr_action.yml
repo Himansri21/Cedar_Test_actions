@@ -1,6 +1,7 @@
 name: Build and Push to ECR
 
 on:
+  workflow_dispatch:
   workflow_call:
     inputs:
       aws-region:
@@ -59,3 +60,4 @@ jobs:
         run: |
           docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+
