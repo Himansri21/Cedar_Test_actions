@@ -3,6 +3,11 @@ name: Dry Run - Cedar Lambda Platform
 on:
   workflow_dispatch:
 
+env:
+  NODE_VERSION: "20"
+  AWS_REGION: "eu-west-1"
+  PROJECT_NAME: "cedar-lambda-hub"
+
 jobs:
   dry-run:
     runs-on: ubuntu-latest
@@ -15,16 +20,36 @@ jobs:
 
       - name: Configure AWS Environment
         run: |
-          echo "Branch: ${GITHUB_REF#refs/heads/}"
-          echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+          BRANCH=${GITHUB_REF#refs/heads/}
+          echo "Detected branch: $BRANCH"
 
-      - name: Set up AWS CLI
+          if [ "$BRANCH" = "main" ]; then
+            echo "Using production credentials"
+            echo "AWS_ACCOUNT_ID=${{ secrets.PROD_ACCOUNT_ID }}" >> $GITHUB_ENV
+            echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+          elif [ "$BRANCH" = "staging" ]; then
+            echo "Using staging credentials"
+            echo "AWS_ACCOUNT_ID=${{ secrets.NON_PROD_ACCOUNT_ID }}" >> $GITHUB_ENV
+            echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+          else
+            echo "Using dev credentials"
+            echo "AWS_ACCOUNT_ID=${{ secrets.NON_PROD_ACCOUNT_ID }}" >> $GITHUB_ENV
+            echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+          fi
+
+      - name: Show selected environment variables
+        run: |
+          echo "Branch: ${{ github.ref }}"
+          echo "ENVIRONMENT: $ENVIRONMENT"
+          echo "AWS_ACCOUNT_ID: $AWS_ACCOUNT_ID"
+
+      - name: Test OIDC Authentication
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: eu-west-1
-          role-to-assume: arn:aws:iam::348286729043:role/OIDC-assumeRole-GithubActions
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/Datamaze-OIDC-Role
 
-      - name: Dry Run Validation
+      - name: Validate AWS Identity
         run: |
-          echo "✅ Successfully assumed role"
+          echo "Testing STS identity..."
           aws sts get-caller-identity
