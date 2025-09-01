@@ -47,7 +47,7 @@ jobs:
       - name: Configure AWS Environment
         run: |
           BRANCH=${GITHUB_REF#refs/heads/}
-          if [ "$BRANCH" = "master" ]; then
+          if [ "$BRANCH" = "main" ]; then
             echo "Using production credentials"
             echo "AWS_AWS_ACCOUNT_ID=${{ secrets.PROD_ACCOUNT_ID }}" >> $GITHUB_ENV
             echo "AWS_ROLE_ARN=${{ secrets.AWS_ROLE_ARN_PROD }}" >> $GITHUB_ENV
