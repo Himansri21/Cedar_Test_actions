@@ -1,12 +1,7 @@
 name: Dry Run - Cedar Lambda Platform
 
 on:
-  workflow_dispatch:   # Run manually from GitHub UI
-  push:
-    branches:
-      - master
-      - staging
-      - develop
+  workflow_dispatch:
 
 env:
   NODE_VERSION: "20"
@@ -23,58 +18,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run linter
-        run: npm run lint
-
-      - name: Build TypeScript
-        run: npm run build
-
-      - name: Setup SAM CLI
-        uses: aws-actions/setup-sam@v2
-
-      - name: SAM Build
-        run: sam build
-
       - name: Configure AWS Environment
         run: |
           BRANCH=${GITHUB_REF#refs/heads/}
+          echo "Detected branch: $BRANCH"
+
           if [ "$BRANCH" = "main" ]; then
             echo "Using production credentials"
-            echo "AWS_AWS_ACCOUNT_ID=${{ secrets.PROD_ACCOUNT_ID }}" >> $GITHUB_ENV
-            echo "AWS_ROLE_ARN=${{ secrets.AWS_ROLE_ARN_PROD }}" >> $GITHUB_ENV
+            echo "AWS_ACCOUNT_ID=${{ secrets.PROD_ACCOUNT_ID }}" >> $GITHUB_ENV
             echo "ENVIRONMENT=prod" >> $GITHUB_ENV
           elif [ "$BRANCH" = "staging" ]; then
-            echo "AWS_AWS_ACCOUNT_ID=${{ secrets.NON_PROD_ACCOUNT_ID }}" >> $GITHUB_ENV
-            echo "AWS_ROLE_ARN=${{ secrets.AWS_ROLE_ARN }}" >> $GITHUB_ENV
+            echo "Using staging credentials"
+            echo "AWS_ACCOUNT_ID=${{ secrets.NON_PROD_ACCOUNT_ID }}" >> $GITHUB_ENV
             echo "ENVIRONMENT=staging" >> $GITHUB_ENV
           else
-            echo "AWS_AWS_ACCOUNT_ID=${{ secrets.NON_PROD_ACCOUNT_ID }}" >> $GITHUB_ENV
-            echo "AWS_ROLE_ARN=${{ secrets.AWS_ROLE_ARN }}" >> $GITHUB_ENV
+            echo "Using dev credentials"
+            echo "AWS_ACCOUNT_ID=${{ secrets.NON_PROD_ACCOUNT_ID }}" >> $GITHUB_ENV
             echo "ENVIRONMENT=dev" >> $GITHUB_ENV
           fi
 
-      - name: Set up AWS CLI
+      - name: Show selected environment variables
+        run: |
+          echo "Branch: ${{ github.ref }}"
+          echo "ENVIRONMENT: $ENVIRONMENT"
+          echo "AWS_ACCOUNT_ID: $AWS_ACCOUNT_ID"
+
+      - name: Test OIDC Authentication
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: ${{ secrets.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ env.AWS_AWS_ACCOUNT_ID }}:role/Datamaze-OIDC-Role
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/Datamaze-OIDC-Role
 
-      - name: Dry Run Validation
+      - name: Validate AWS Identity
         run: |
-          echo "✅ Successfully assumed role: ${AWS_ROLE_ARN}"
-          echo "✅ Environment: ${ENVIRONMENT}"
-          echo "✅ AWS Account ID: ${AWS_AWS_ACCOUNT_ID}"
-          
-          echo "Testing AWS CLI authentication..."
+          echo "Testing STS identity..."
           aws sts get-caller-identity
-          
-          echo "Dry run completed. No resources were created or modified."
